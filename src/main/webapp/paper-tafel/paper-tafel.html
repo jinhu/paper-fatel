@@ -1,0 +1,268 @@
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!--
+/**
+ * @group Paper Elements
+ *
+ * A fancy looking calculator that can only perform simple math calculation. 
+ * 
+ * @element paper-calculator
+ * @homepage github.io
+ */
+-->
+
+<link rel="import" href="../core-media-query/core-media-query.html">
+<link rel="import" href="paper-calculator-output.html">
+<link rel="import" href="paper-calculator-keypad.html">
+<link rel="import" href="paper-calculator-math.html">
+
+<polymer-element name="paper-tafel" attributes="expression result wideMode responsiveWidth timer-string" tabindex="0">
+
+  <template>
+
+    <style>
+
+      :host {
+        display: block;
+        position: relative;
+        background-color: #eee;
+        overflow: hidden;
+
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        -webkit-touch-callout: none;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #output {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 38%;
+        z-index: 1;
+      }
+
+      #output.wide {      
+        box-shadow: 0 5px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      #keypad {
+        position: absolute;
+        top: 38%;
+        bottom: 0;
+        width: 100%;
+      }
+
+      #resultInk {
+        position: absolute;
+        border-radius: 50%;
+        background-color: #73daeb;
+        -webkit-transform: translateZ(0) scale(0);
+        transform: translateZ(0) scale(0);
+      }
+
+      #resultInk.error {
+          background-color: #f55757;
+      }
+      #resultInk.correct {
+          background-color: #57f557;
+      }
+
+      #resultInk.spill {
+        -webkit-transform: translateZ(0) scale(1);
+        transform: translateZ(0) scale(1);
+        -webkit-transition: -webkit-transform 0.38s ease-out;
+        transition: transform 0.38s ease-out;
+      }
+
+    </style>
+
+    <div id="resultInk" class="{{ {spill : isAnswerComplete() , error : error , correct: isAnswerCorrect()} | tokenList }}"></div>
+
+    <paper-calculator-output id="output" class="{{ {wide : wideMatches || wideMode} | tokenList}}" expression="{{expression}}" result="{{result}}" error="{{error}}" timer="{{timer}}" incorrect="{{incorrect}}" correct="{{correct}}"></paper-calculator-output>
+
+    <paper-calculator-keypad id="keypad" wideMode="{{wideMatches || wideMode}}" standardKeys="{{standardKeys}}"
+                              on-cal-keytap="{{keyTap}}">
+
+    </paper-calculator-keypad>
+    <core-media-query query="min-width: {{responsiveWidth}}" queryMatches="{{wideMatches}}"></core-media-query>
+
+  </template>
+
+  <script>
+
+    Polymer('paper-calculator', {
+
+      domReady: function() {
+        this.updateResultInk();
+        window.addEventListener('resize', this.updateResultInk.bind(this));
+      },
+      standardKeys: [
+        ['7', '4', '1', 'start'],
+        ['8', '5', '2', '0'],
+        ['9', '6', '3', 'stop'],
+      ],
+
+
+      modeKeys: [
+        ['Deg', 'Rad', 'func', 'Table', 'Graph', '']
+      ],
+
+      errorMsgs: ['error...', 'umm...', ':-('],
+
+      /**
+       * If true, calculator changes to wide layout.
+       *
+       * @attribute wideMode
+       * @type boolean
+       * @default false
+       */
+      wideMode: false,
+
+      /**
+       * Min-width when calculator changes to wide layout.
+       *
+       * @attribute responsiveWidth
+       * @type string
+       * @default ''
+       */
+      responsiveWidth: '',
+
+      /**
+       * The expression entered to the calculator.
+       *
+       * @attribute expression
+       * @type string
+       * @default ''
+       */
+      expression: '',
+
+      /**
+       * The result from evaluating the expression.
+       *
+       * @attribute result
+       * @type string
+       * @default ''
+       */
+      result: '',
+        correct:0,
+        incorrect:0,
+        expected: 12,
+      eventDelegates: {
+        keydown: 'keyDown',
+        keypress: 'keyPress'
+      },
+
+      clear: function() {
+          this.expression = Math.floor(Math.random()* 10) +"*" + Math.floor(Math.random()* 10);
+          this.expected = eval(this.expression);
+          this.result="";
+        this.error = '';
+        this.timer=this.timer-string;//"............";
+
+      },
+        isAnswerComplete: function() {
+            return this.result.length >=this.expected.toString().length;
+        },
+      del: function() {
+        this.result = this.result.slice(0, -1);
+      },
+
+      keyTap: function(e) {
+        var k = e.detail.key;
+        if (this.modeKeys[0].indexOf(k) < 0) {
+          this.processKey(k);
+        }
+      },
+
+      keyDown: function(e) {
+        // backspace key
+        if (e.keyCode === 8) {
+          this.del();
+          e.preventDefault();
+        }
+      },
+
+        keyPress: function(e) {
+            var c = e.keyCode, k;
+                 k = String.fromCharCode(c);
+            var key = this.$.keypad.findKey(k);
+            this.processKey(k);
+            e.preventDefault();
+        },
+        isAnswerCorrect: function() {
+            try{
+                return this.result == this.expected;
+            }catch(e){
+                return false;
+            }
+        },
+        answered: function() {
+            if (this.isAnswerCorrect()) {
+                this.error = null;
+            } else { //if(this.result.length>=2)
+                this.error = "wrong";
+            }
+        },
+        updateTimer:function () {
+        this.timer = this.timer.slice(0,this.timer.length -1)
+            if(this.timer.length==0){
+                if(this.isAnswerCorrect()){
+                    this.correct++;
+                }else{
+                    this.incorrect++;
+                }
+
+                this.clear()
+            }
+    },
+        processKey: function(k) {
+        if (k === 'start' && !this.started) {
+            this.clear();
+            this.started = setInterval(this.updateTimer.bind(this), 1000);
+        }else if (k === 'stop' && this.started != 0) {
+            clearInterval(this.started);
+            this.started=0;
+        }else {
+          if(this.result.length >=2){
+              this.result = "";
+          }
+          this.result += k;
+            this.answered();
+        }
+      },
+
+      updateResultInk: function() {
+        var rect = this.getBoundingClientRect();
+        var keyRect = this.$.keypad.equalKey.getBoundingClientRect();
+        var s  = this.$.resultInk.style;
+        var t = keyRect.top - rect.top + keyRect.height / 2;
+        s.top = -t + 'px';
+        s.left = -t * 2 + (keyRect.left - rect.left + keyRect.width / 2) + 'px';
+        s.width = s.height = 4 * t + 'px';
+      },
+
+      resultChanged: function() {
+        if (this.result === '?') {
+          this.error = this.errorMsgs[Math.floor(Math.random() * 
+              this.errorMsgs.length)];
+        }
+      }
+
+    });
+
+  </script>
+
+</polymer-element>
